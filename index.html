@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>스탑워치 게임</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Courier New', monospace;
+            background: #000;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            background: #fff;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(255,255,255,0.1);
+            max-width: 500px;
+            width: 100%;
+            border: 3px solid #000;
+        }
+        h1 { 
+            text-align: center; 
+            color: #000; 
+            margin-bottom: 30px;
+            font-family: 'Arial Black', sans-serif;
+            letter-spacing: 2px;
+        }
+        .setup { text-align: center; }
+        .setup label { 
+            display: block; 
+            margin-bottom: 10px; 
+            font-size: 18px; 
+            color: #000;
+            font-weight: bold;
+        }
+        .setup input { 
+            width: 80px; 
+            padding: 10px; 
+            font-size: 18px; 
+            border: 2px solid #000; 
+            border-radius: 8px; 
+            text-align: center;
+            font-family: 'Courier New', monospace;
+            background: #fff;
+        }
+        button {
+            background: #000;
+            color: #fff;
+            border: none;
+            padding: 15px 40px;
+            font-size: 18px;
+            border-radius: 50px;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: all 0.3s;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+        button:hover { 
+            background: #333;
+            transform: scale(1.05); 
+        }
+        button:active { transform: scale(0.95); }
+        .game-area { text-align: center; }
+        .player-info {
+            background: #f0f0f0;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-size: 18px;
+            border: 2px solid #000;
+            font-weight: bold;
+        }
+        .stopwatch-display {
+            background: #000;
+            color: #fff;
+            font-size: 80px;
+            font-weight: bold;
+            margin: 40px 0;
+            padding: 40px;
+            border-radius: 20px;
+            font-family: 'Courier New', monospace;
+            letter-spacing: 8px;
+            border: 5px solid #333;
+            box-shadow: inset 0 0 20px rgba(255,255,255,0.1);
+        }
+        .time-parts {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 5px;
+        }
+        .time-part {
+            display: inline-block;
+        }
+        .millisecond {
+            color: #00ff00;
+            font-size: 100px;
+        }
+        .results { text-align: center; }
+        .result-item {
+            background: #f8f9fa;
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 10px;
+            border: 3px solid #000;
+        }
+        .result-item.winner { 
+            background: #ffed4e;
+            border: 3px solid #000;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        .result-item h3 { margin-bottom: 10px; font-size: 20px; }
+        .numbers { color: #666; margin: 5px 0; font-family: 'Courier New', monospace; }
+        .score { 
+            font-size: 24px; 
+            font-weight: bold; 
+            color: #000;
+            font-family: 'Courier New', monospace;
+        }
+        button[style*="background: #28a745"] {
+            background: #000 !important;
+            border: 3px solid #00ff00;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        function NumberGame() {
+            const [gameState, setGameState] = useState('setup');
+            const [playerCount, setPlayerCount] = useState(2);
+            const [nicknames, setNicknames] = useState(['', '']);
+            const [currentPlayer, setCurrentPlayer] = useState(0);
+            const [centiseconds, setCentiseconds] = useState(0);
+            const [seconds, setSeconds] = useState(0);
+            const [players, setPlayers] = useState([]);
+            const [isPaused, setIsPaused] = useState(false);
+            const intervalRef = useRef(null);
+
+            useEffect(() => {
+                if (gameState === 'playing' && !isPaused) {
+                    intervalRef.current = setInterval(() => {
+                        setCentiseconds(prev => {
+                            const next = prev + 1;
+                            if (next >= 100) {
+                                setSeconds(s => s + 1);
+                                return 0;
+                            }
+                            return next;
+                        });
+                    }, 10);
+                } else {
+                    if (intervalRef.current) {
+                        clearInterval(intervalRef.current);
+                    }
+                }
+                return () => {
+                    if (intervalRef.current) clearInterval(intervalRef.current);
+                };
+            }, [gameState, isPaused]);
+
+            const handlePlayerCountChange = (count) => {
+                const newCount = Math.max(2, Math.min(10, count));
+                setPlayerCount(newCount);
+                setNicknames(Array.from({ length: newCount }, (_, i) => nicknames[i] || ''));
+            };
+
+            const handleNicknameChange = (index, value) => {
+                const newNicknames = [...nicknames];
+                newNicknames[index] = value;
+                setNicknames(newNicknames);
+            };
+
+            const startGame = () => {
+                const initialPlayers = Array.from({ length: playerCount }, (_, i) => ({
+                    id: i + 1,
+                    nickname: nicknames[i] || `플레이어 ${i + 1}`,
+                    numbers: [],
+                    score: 0
+                }));
+                setPlayers(initialPlayers);
+                setGameState('playing');
+                setCurrentPlayer(0);
+            };
+
+            const handleStop = () => {
+                setIsPaused(true);
+                const lastDigit = centiseconds % 10;
+                const newPlayers = [...players];
+                newPlayers[currentPlayer].numbers.push(lastDigit);
+                setPlayers(newPlayers);
+            };
+
+            const handleGo = () => {
+                const player = players[currentPlayer];
+                
+                if (player.numbers.length === 2) {
+                    const newPlayers = [...players];
+                    newPlayers[currentPlayer].score = 
+                        newPlayers[currentPlayer].numbers[0] * newPlayers[currentPlayer].numbers[1];
+                    
+                    if (currentPlayer === playerCount - 1) {
+                        newPlayers.sort((a, b) => b.score - a.score);
+                        setPlayers(newPlayers);
+                        setGameState('results');
+                    } else {
+                        setCurrentPlayer(currentPlayer + 1);
+                        setIsPaused(false);
+                        setPlayers(newPlayers);
+                    }
+                } else {
+                    setIsPaused(false);
+                }
+            };
+
+            const resetGame = () => {
+                setGameState('setup');
+                setCurrentPlayer(0);
+                setCentiseconds(0);
+                setSeconds(0);
+                setPlayers([]);
+                setIsPaused(false);
+                setNicknames(Array.from({ length: playerCount }, () => ''));
+            };
+
+            if (gameState === 'setup') {
+                return (
+                    <div className="container">
+                        <h1>⏱️ 스탑워치 게임</h1>
+                        <div className="setup">
+                            <label>참여 인원 수</label>
+                            <input 
+                                type="number" 
+                                min="2" 
+                                max="10" 
+                                value={playerCount}
+                                onChange={(e) => handlePlayerCountChange(parseInt(e.target.value) || 2)}
+                            />
+                            
+                            <div style={{marginTop: '30px'}}>
+                                <label style={{marginBottom: '15px'}}>참가자 닉네임</label>
+                                {Array.from({ length: playerCount }, (_, i) => (
+                                    <div key={i} style={{marginBottom: '10px'}}>
+                                        <input 
+                                            type="text"
+                                            placeholder={`플레이어 ${i + 1}`}
+                                            value={nicknames[i]}
+                                            onChange={(e) => handleNicknameChange(i, e.target.value)}
+                                            style={{width: '200px'}}
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                            
+                            <button onClick={startGame}>게임 시작</button>
+                        </div>
+                    </div>
+                );
+            }
+
+            if (gameState === 'playing') {
+                const player = players[currentPlayer];
+                const displaySeconds = String(seconds).padStart(2, '0');
+                const displayCentiseconds = String(centiseconds).padStart(2, '0');
+                
+                return (
+                    <div className="container">
+                        <h1>⏱️ 스탑워치 게임</h1>
+                        <div className="game-area">
+                            <div className="player-info">
+                                {player.nickname}
+                                {player.numbers.length === 1 && 
+                                    <div style={{marginTop: '5px', color: '#666'}}>
+                                        첫 번째: {player.numbers[0]}
+                                    </div>
+                                }
+                                {player.numbers.length === 2 && 
+                                    <div style={{marginTop: '5px', color: '#666'}}>
+                                        {player.numbers[0]} × {player.numbers[1]} = {player.numbers[0] * player.numbers[1]}
+                                    </div>
+                                }
+                            </div>
+                            <div className="stopwatch-display">
+                                <div className="time-parts">
+                                    <span className="time-part">{displaySeconds}:</span>
+                                    <span className="time-part">{displayCentiseconds[0]}</span>
+                                    <span className="time-part millisecond">{displayCentiseconds[1]}</span>
+                                </div>
+                            </div>
+                            {!isPaused ? (
+                                <button onClick={handleStop}>STOP</button>
+                            ) : (
+                                <button onClick={handleGo} style={{background: '#000', border: '3px solid #00ff00'}}>GO</button>
+                            )}
+                        </div>
+                    </div>
+                );
+            }
+
+            if (gameState === 'results') {
+                return (
+                    <div className="container">
+                        <h1>🏆 결과</h1>
+                        <div className="results">
+                            {players.map((player, index) => (
+                                <div key={player.id} className={`result-item ${index === 0 ? 'winner' : ''}`}>
+                                    <h3>{index + 1}위: {player.nickname}</h3>
+                                    <div className="numbers">
+                                        {player.numbers[0]} × {player.numbers[1]}
+                                    </div>
+                                    <div className="score">점수: {player.score}</div>
+                                </div>
+                            ))}
+                            <button onClick={resetGame}>다시 시작</button>
+                        </div>
+                    </div>
+                );
+            }
+        }
+
+        ReactDOM.render(<NumberGame />, document.getElementById('root'));
+    </script>
+</body>
+</html>
